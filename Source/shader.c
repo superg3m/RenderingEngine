@@ -23,7 +23,7 @@ void shader_check_compile_erros(u32 shaderID, const char* type) {
 
 // Date: August 15, 2024
 // NOTE(Jovanni): You might not even need this shader_discriptors
-Shader shader_create(ShaderDescriptor* shader_descriptor, u32 shader_descriptor_count) {
+Shader shader_create(Descriptor* shader_descriptor, u32 shader_descriptor_count) {
     Shader ret = {0};
     u32* shader_source_ids = NULLPTR; 
 
