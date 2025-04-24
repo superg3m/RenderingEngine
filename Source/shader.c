@@ -25,7 +25,7 @@ void shader_check_compile_erros(u32 shaderID, const char* type) {
 // NOTE(Jovanni): You might not even need this shader_discriptors
 Shader shader_create(Descriptor* shader_descriptor, u32 shader_descriptor_count) {
     Shader ret = {0};
-    u32* shader_source_ids = NULLPTR; 
+    u32* shader_source_ids = NULL; 
 
     ret.id = glCreateProgram();
     for (int i = 0; i < shader_descriptor_count; i++) {

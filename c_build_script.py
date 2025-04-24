@@ -18,7 +18,7 @@ from c_build.source.Manager import *
 
 pc: ProjectConfig = ProjectConfig(
     project_name = "RenderingEngine",
-    project_dependencies = ["ckit"],
+    project_dependencies = [""],
     project_debug_with_visual_studio = True,
     project_rebuild_project_dependencies = False,
     project_executable_procedures  = ["win32_main.exe"]
@@ -58,11 +58,11 @@ procedures_config = {
     "win32_main": ProcedureConfigElement(
         build_directory = f"./build_{cc.compiler_name}",
         output_name = "win32_main.exe",
-        source_files = ["../Source/*.c"],
-        additional_libs = [],
+        source_files = ["../Source/win32_main.c"],
+        additional_libs = executable_procedure_libs,
         compile_time_defines = [],
         compiler_inject_into_args = [],
-        include_paths = []
+        include_paths = ["../Include"]
     ),
 }
 

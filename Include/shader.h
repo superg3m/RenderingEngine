@@ -1,5 +1,5 @@
 #pragam once
-// #include <
+
 #include "./External_Libraries/glad/include/glad/glad.h"
 #include "./External_Libraries/stb_image.h"
 
@@ -24,4 +24,3 @@ Shader shader_create(ShaderDescriptor* shader_descriptor, u32 shader_descriptor_
 void shader_add_texture(Shader* shader, const char* texture_path);
 void shader_use(Shader* shader);
 void shader_bind_textures(Shader* shader);
-void wgl_context_create(HDC dc_handle);
