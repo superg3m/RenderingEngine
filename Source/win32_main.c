@@ -6,7 +6,6 @@ static HANDLE render_thread_handle = NULL;
 static HGLRC opengl_context = NULL;
 
 static double rotation_angle = 0.0;
-static LARGE_INTEGER last_time, current_time, frequency;
 static const float ROTATION_SPEED = 180.0f;
 
 typedef BOOL (WINAPI PFNWGLSWAPINTERVALEXTPROC)(int);
@@ -81,7 +80,6 @@ void win32_opengl_init(HWND window, HDC hdc) {
     if(!wglMakeCurrent(hdc, opengl_context)) {
         CRASH;
     }
-    ReleaseDC(window, hdc);
 
     wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC*)wglGetProcAddress("wglSwapIntervalEXT");
     if (wglSwapIntervalEXT) {
@@ -89,9 +87,8 @@ void win32_opengl_init(HWND window, HDC hdc) {
     } else {
         MessageBoxA(0, "Failed to load wglSwapIntervalEXT!", "Error", MB_ICONERROR);
     }
-    
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&last_time);
+
+    ReleaseDC(window, hdc);
 }
 
 void cleanup_opengl(HWND window) {
@@ -113,12 +110,14 @@ DWORD WINAPI update_and_render(LPVOID param) {
     while (window_is_running) {
         current_time = os_query_performance_counter();
         double delta_time = current_time - previous_time;
+        double delta_time_seconds = delta_time / 1000.0f;
         
-        rotation_angle += ROTATION_SPEED * delta_time / 1000.0f;
+        rotation_angle += ROTATION_SPEED * delta_time_seconds;
         if (rotation_angle >= 360.0) {
             rotation_angle -= 360.0;
         }
         
+        hdc = GetDC(window_handle);
         RECT client_rect;
         GetClientRect(window_handle, &client_rect);
         int width = client_rect.right - client_rect.left;
@@ -137,13 +136,11 @@ DWORD WINAPI update_and_render(LPVOID param) {
         glColor3f(0.0f, 0.0f, 1.0f); glVertex2f(0.0f, 0.75f);
         glEnd();
             
-        hdc = GetDC(window_handle);
+
         SwapBuffers(hdc);
         ReleaseDC(window_handle, hdc);
    
-
-		double seconds_per_frame = delta_time / 1000.0;
-		u64 fps = (u64)(1.0 / seconds_per_frame);
+		u64 fps = (u64)(1.0 / delta_time_seconds);
 
         char buffer[1024] = {0};
 		snprintf(buffer, ArrayCount(buffer), "%fms / FPS: %d\n", (float)delta_time, (u32)fps);
