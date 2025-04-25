@@ -1,75 +1,26 @@
 #include <types.h>
-#include <glad/glad.h>
 #include <gl/GL.h>
 
-typedef struct Bitmap {
-    BITMAPINFO info;
-    int width;
-    int height;
-    int bytes_per_pixel;
-    int memory_size;
-    void* memory;
-} Bitmap;
-
 static volatile bool window_is_running = false;
+static HANDLE render_thread_handle = NULL;
+static HGLRC opengl_context = NULL;
 
-void win32_draw_bitmap(HWND window_handle, Bitmap* bitmap, int x, int y) {
-    HDC hdc = GetDC(window_handle);
-    RECT client_rect;
-    GetClientRect(window_handle, &client_rect);
+static double rotation_angle = 0.0;
+static LARGE_INTEGER last_time, current_time, frequency;
+static const float ROTATION_SPEED = 180.0f;
 
+typedef BOOL (WINAPI PFNWGLSWAPINTERVALEXTPROC)(int);
+PFNWGLSWAPINTERVALEXTPROC* wglSwapIntervalEXT = NULL;
 
-    u32 client_width = client_rect.right - client_rect.left;
-    u32 client_height = client_rect.bottom - client_rect.top;
+double os_query_performance_counter() {
+    LARGE_INTEGER performance_counter_frequency;
+    QueryPerformanceFrequency(&performance_counter_frequency);
 
-    StretchDIBits(hdc, x, y, client_width, client_height, 
-                    0, 0, bitmap->width, bitmap->height, 
-                    bitmap->memory, &bitmap->info,
-                    DIB_RGB_COLORS, SRCCOPY);
-}
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    double milliseconds_elapsed = ((double)(counter.QuadPart * 1000.0) / (double)performance_counter_frequency.QuadPart);
 
-void win32_resize_bitmap(Bitmap* bitmap, u32 width, u32 height) {
-    bitmap->width = width;
-    bitmap->height = height;
-    bitmap->bytes_per_pixel = 4;
-
-    if (bitmap->memory) {
-        VirtualFree(bitmap->memory, 0, MEM_RELEASE);
-    }
-
-    bitmap->info.bmiHeader.biSize = sizeof(bitmap->info.bmiHeader);
-    bitmap->info.bmiHeader.biWidth = bitmap->width;
-    bitmap->info.bmiHeader.biHeight = -bitmap->height;
-    bitmap->info.bmiHeader.biPlanes = 1;
-    bitmap->info.bmiHeader.biBitCount = 32;
-    bitmap->info.bmiHeader.biCompression = BI_RGB;
-    bitmap->info.bmiHeader.biSizeImage = 0;
-    bitmap->info.bmiHeader.biXPelsPerMeter = 0;
-    bitmap->info.bmiHeader.biYPelsPerMeter = 0;
-    bitmap->info.bmiHeader.biClrUsed = 0;
-    bitmap->info.bmiHeader.biClrImportant = 0;
-
-    bitmap->memory_size = bitmap->bytes_per_pixel *  bitmap->width * bitmap->height;
-    bitmap->memory = VirtualAlloc(0, bitmap->memory_size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
-}
-
-void set_bitmap_gradient(Bitmap *bitmap, u32 x_offset, u32 y_offset) {
-    int stride = bitmap->width * bitmap->bytes_per_pixel;
-
-    u8* row = (u8*)bitmap->memory;    
-    for(u32 y = 0; y < (u32)bitmap->height; y++) {
-        u32* pixel = (u32*)row;
-        for(u32 x = 0; x < (u32)bitmap->width; x++) {
-            const u32 red = ((100 + x + x_offset) << 16);
-            const u32 green = (10  << 8);
-            const u32 blue = ((100 + y + y_offset) << 0);
-            
-            const u32 rgb = red|green|blue;
-
-            *pixel++ = rgb;
-        }
-        row += stride;
-    }
+    return milliseconds_elapsed;
 }
 
 LRESULT CALLBACK custom_window_procedure(HWND handle, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -77,27 +28,25 @@ LRESULT CALLBACK custom_window_procedure(HWND handle, UINT message, WPARAM wPara
     switch (message) {
         case WM_CLOSE:
         case WM_DESTROY: {
-            PostQuitMessage(0); 
+            PostQuitMessage(0);
             window_is_running = false;
         } break;
-
-        case WM_PAINT: { // Repaint window when its dirty
+        case WM_PAINT: {
             PAINTSTRUCT paint;
             HDC hdc = BeginPaint(handle, &paint);
             EndPaint(handle, &paint);
         } break;
-        
+       
         default: {
             result = DefWindowProcA(handle, message, wParam, lParam);
         } break;
     }
-
     return result;
 }
 
 HWND window_create(HINSTANCE hInstance, int width, int height, const char* name) {
     WNDCLASSA window_class = {0};
-    window_class.style = CS_HREDRAW|CS_VREDRAW;
+    window_class.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
     window_class.lpfnWndProc = custom_window_procedure;
     window_class.cbClsExtra = 0;
     window_class.cbWndExtra = 0;
@@ -107,30 +56,16 @@ HWND window_create(HINSTANCE hInstance, int width, int height, const char* name)
     // window_class.hbrBackground = NULL;
     // window_class.lpszMenuName = NULL;
     window_class.lpszClassName = name;
-
     RegisterClassA(&window_class);
-
     // Date: May 04, 2024
     // TODO(Jovanni): Extended Window Styles (look into them you can do cool stuff)
     // WS_EX_ACCEPTFILES 0x00000010L (The window accepts drag-drop files.)
     DWORD dwStyle = WS_OVERLAPPEDWINDOW|WS_VISIBLE;
     HWND handle = CreateWindowExA(0, name, name, dwStyle, CW_USEDEFAULT, CW_USEDEFAULT, width, height, NULL, NULL, hInstance, NULL);
-
     return handle;
 }
 
-// Next thing:
-// - CreateThread() for software renderer
-// - wglMakeCurrent()
-/* 
-BOOL SetPropA(
-  [in]           HWND   hWnd,
-  [in]           LPCSTR lpString,
-  [in, optional] HANDLE hData
-);
-*/
-
-void win32_opengl_init(HWND window) {
+void win32_opengl_init(HWND window, HDC hdc) {
     PIXELFORMATDESCRIPTOR pfd = {0};
     pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
     pfd.nVersion = 1;
@@ -139,67 +74,94 @@ void win32_opengl_init(HWND window) {
     pfd.cColorBits = 24;
     pfd.cAlphaBits = 8;
     pfd.iLayerType = PFD_MAIN_PLANE;
-
-    HDC hdc = GetDC(window);
     int pf_index = ChoosePixelFormat(hdc, &pfd);
     DescribePixelFormat(hdc, pf_index, sizeof(PIXELFORMATDESCRIPTOR), &pfd);
     SetPixelFormat(hdc, pf_index, &pfd);
-
-    HGLRC opengl_context = wglCreateContext(hdc);
-    if(!wglMakeCurrent(hdc, opengl_context) || !gladLoadGL()) {
+    opengl_context = wglCreateContext(hdc);
+    if(!wglMakeCurrent(hdc, opengl_context)) {
         CRASH;
     }
-
     ReleaseDC(window, hdc);
+
+    wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC*)wglGetProcAddress("wglSwapIntervalEXT");
+    if (wglSwapIntervalEXT) {
+        wglSwapIntervalEXT(1);
+    } else {
+        MessageBoxA(0, "Failed to load wglSwapIntervalEXT!", "Error", MB_ICONERROR);
+    }
+    
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&last_time);
 }
 
+void cleanup_opengl(HWND window) {
+    if (opengl_context) {
+        wglMakeCurrent(NULL, NULL);
+        wglDeleteContext(opengl_context);
+        opengl_context = NULL;
+    }
+}
 
 DWORD WINAPI update_and_render(LPVOID param) {
-    Bitmap bitmap = {0};
     HWND window_handle = (HWND)param;
-    win32_opengl_init(window_handle);
     HDC hdc = GetDC(window_handle);
+    win32_opengl_init(window_handle, hdc);
+
+    double current_time = os_query_performance_counter();
+    double previous_time = current_time;
     
-    // u32 x_offset = 0;
-
-    // win32_resize_bitmap(&bitmap, width, height);
-
     while (window_is_running) {
-        // set_bitmap_gradient(&bitmap, x_offset, 0);
-        // win32_draw_bitmap(window_handle, &bitmap, 0, 0);
-        // x_offset++;
-
+        current_time = os_query_performance_counter();
+        double delta_time = current_time - previous_time;
+        
+        rotation_angle += ROTATION_SPEED * delta_time / 1000.0f;
+        if (rotation_angle >= 360.0) {
+            rotation_angle -= 360.0;
+        }
+        
         RECT client_rect;
         GetClientRect(window_handle, &client_rect);
         int width = client_rect.right - client_rect.left;
         int height = client_rect.bottom - client_rect.top;
-
+        
         glViewport(0, 0, width, height);
-
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-    
-        glRotatef(0.1f, 0, 0, 1);
-    
+
+        glLoadIdentity();
+        glRotatef((float)rotation_angle, 0, 0, 1);
+        
         glBegin(GL_TRIANGLES);
         glColor3f(1.0f, 0.0f, 0.0f); glVertex2f(-0.6f, -0.75f);
         glColor3f(0.0f, 1.0f, 0.0f); glVertex2f(0.6f, -0.75f);
         glColor3f(0.0f, 0.0f, 1.0f); glVertex2f(0.0f, 0.75f);
         glEnd();
-
+            
+        hdc = GetDC(window_handle);
         SwapBuffers(hdc);
-    }
+        ReleaseDC(window_handle, hdc);
+   
 
-    ReleaseDC(window_handle, hdc);
+		double seconds_per_frame = delta_time / 1000.0;
+		u64 fps = (u64)(1.0 / seconds_per_frame);
+
+        char buffer[1024] = {0};
+		snprintf(buffer, ArrayCount(buffer), "%fms / FPS: %d\n", (float)delta_time, (u32)fps);
+        OutputDebugStringA(buffer);
+
+		previous_time = current_time;
+    }
+    
+    cleanup_opengl(window_handle);
     return 0;
 }
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow) {
     HWND window_handle = window_create(hInstance, 800, 600, "Testing Window");
-
     window_is_running = true;
-    HANDLE render_thread = CreateThread(0, 0, update_and_render, (void*)window_handle, 0, 0);
-    CloseHandle(render_thread);
+    
+    render_thread_handle = CreateThread(0, 0, update_and_render, (void*)window_handle, 0, 0);
+    CloseHandle(render_thread_handle);
 
     while (window_is_running) {
         MSG msg;
@@ -210,6 +172,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hInstPrev, PSTR cmdline, int
             window_is_running = false;
         }
     }
-
+    
     return 0;
 }
