@@ -165,6 +165,7 @@ HWND window_create(HINSTANCE hInstance, int width, int height, const char* name)
 }
 
 // Next thing:
+// - CreateThread() for software renderer
 // - wglMakeCurrent()
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow) {
     HWND window_handle = window_create(hInstance, 800, 600, "Testing Window");
