@@ -9,11 +9,7 @@ typedef struct Bitmap {
     void* memory;
 } Bitmap;
 
-void wgl_context_create(HDC dc_handle);
-
-static bool interacting_with_left_menu = false;
-static bool window_is_running = false;
-internal Bitmap bitmap;
+static volatile bool window_is_running = false;
 
 void win32_draw_bitmap(HWND window_handle, Bitmap* bitmap, int x, int y) {
     HDC hdc = GetDC(window_handle);
@@ -77,58 +73,15 @@ void set_bitmap_gradient(Bitmap *bitmap, u32 x_offset, u32 y_offset) {
 LRESULT CALLBACK custom_window_procedure(HWND handle, UINT message, WPARAM wParam, LPARAM lParam) {
     LRESULT result = 0;
     switch (message) {
-        case WM_CREATE: {
-        
-        } break;
-
-        case WM_SIZE: { // Resize
-            RECT client_rect;
-            GetClientRect(handle, &client_rect);
-            int width = client_rect.right - client_rect.left;
-            int height = client_rect.bottom - client_rect.top;
-            win32_resize_bitmap(&bitmap, width, height);
-        } break;
-
-        case WM_CLOSE: {
-            PostQuitMessage(0);
-        } break;
-
+        case WM_CLOSE:
         case WM_DESTROY: {
-            PostQuitMessage(0);
-        } break;
-
-        case WM_NCLBUTTONDBLCLK: {
-            // Handle the double-click on the top-left icon
-            if (wParam == HTSYSMENU) {
-                interacting_with_left_menu = TRUE;
-            }
-
-            return DefWindowProcA(handle, message, wParam, lParam);
-        } break;
-
-        case WM_SYSCOMMAND: {
-            // Handle the double-click on the top-left icon
-            if ((wParam & 0xFFF0) == SC_MOUSEMENU) {
-                // you can full screen and minimize here like normal behaviour
-                return 0;
-            }
-            
-            if (((wParam & 0xFFF0) == SC_CLOSE) && interacting_with_left_menu) {
-                interacting_with_left_menu = FALSE;
-                return 0;
-            }
-
-            return DefWindowProcA(handle, message, wParam, lParam);
+            PostQuitMessage(0); 
+            window_is_running = false;
         } break;
 
         case WM_PAINT: { // Repaint window when its dirty
             PAINTSTRUCT paint;
             HDC hdc = BeginPaint(handle, &paint);
-
-            // SetPropA(handle, "", something_here)
-            // ckit_window_update_callback(handle);
-            // ckit_window_render_callback(handle);
-
             EndPaint(handle, &paint);
         } break;
         
@@ -167,28 +120,51 @@ HWND window_create(HINSTANCE hInstance, int width, int height, const char* name)
 // Next thing:
 // - CreateThread() for software renderer
 // - wglMakeCurrent()
+/* 
+BOOL SetPropA(
+  [in]           HWND   hWnd,
+  [in]           LPCSTR lpString,
+  [in, optional] HANDLE hData
+);
+*/
+
+
+DWORD WINAPI update_and_render(LPVOID param) {
+    Bitmap bitmap = {0};
+    HWND window_handle = (HWND)param;
+    u32 x_offset = 0;
+
+    RECT client_rect;
+    GetClientRect(window_handle, &client_rect);
+    int width = client_rect.right - client_rect.left;
+    int height = client_rect.bottom - client_rect.top;
+    win32_resize_bitmap(&bitmap, width, height);
+
+    while (window_is_running) {
+        set_bitmap_gradient(&bitmap, x_offset, 0);
+        win32_draw_bitmap(window_handle, &bitmap, 0, 0);
+    
+        x_offset++;
+    }
+
+    return 0;
+}
+
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow) {
     HWND window_handle = window_create(hInstance, 800, 600, "Testing Window");
 
     window_is_running = true;
-    s32 x_offset = 0;
+    HANDLE render_thread = CreateThread(0, 0, update_and_render, (void*)window_handle, 0, 0);
+    CloseHandle(render_thread);
 
     while (window_is_running) {
-        MSG message;
-        while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE)) {
-            if (message.message == WM_QUIT) {
-                window_is_running = false;
-                break;
-            }
-
-            TranslateMessage(&message);
-            DispatchMessage(&message);
+        MSG msg;
+        if(GetMessage(&msg, 0, 0, 0) > 0) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        } else {
+            window_is_running = false;
         }
- 
-        set_bitmap_gradient(&bitmap, x_offset, 0);
-        win32_draw_bitmap(window_handle, &bitmap, 0, 0);
-
-        x_offset++;
     }
 
     return 0;
