@@ -19,7 +19,7 @@ from c_build.source.Manager import *
 pc: ProjectConfig = ProjectConfig(
     project_name = "RenderingEngine",
     project_dependencies = [""],
-    project_debug_with_visual_studio = True,
+    project_debug_with_visual_studio = False,
     project_rebuild_project_dependencies = False,
     project_executable_procedures  = ["win32_main.exe"]
 )
@@ -51,18 +51,18 @@ else:
 
 executable_procedure_libs = []
 if IS_WINDOWS():
-    windows_libs = ["User32.lib", "Gdi32.lib"] if cc.compiler_name == "cl" else ["-lUser32", "-lGdi32"]
+    windows_libs = ["Kernel32.lib", "User32.lib", "Gdi32.lib", "OpenGL32.lib"] if cc.compiler_name == "cl" else ["-lUser32", "-lGdi32"]
     executable_procedure_libs += windows_libs
 
 procedures_config = {
     "win32_main": ProcedureConfigElement(
         build_directory = f"./build_{cc.compiler_name}",
         output_name = "win32_main.exe",
-        source_files = ["../Source/win32_main.c"],
+        source_files = ["../Source/win32_main.c", "../Libraries/glad/src/glad.c"],
         additional_libs = executable_procedure_libs,
         compile_time_defines = [],
         compiler_inject_into_args = [],
-        include_paths = ["../Include"]
+        include_paths = ["../Include", "../Libraries/glad/include"]
     ),
 }
 

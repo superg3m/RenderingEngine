@@ -1,4 +1,6 @@
 #include <types.h>
+#include <glad/glad.h>
+#include <gl/GL.h>
 
 typedef struct Bitmap {
     BITMAPINFO info;
@@ -128,25 +130,67 @@ BOOL SetPropA(
 );
 */
 
+void win32_opengl_init(HWND window) {
+    PIXELFORMATDESCRIPTOR pfd = {0};
+    pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+    pfd.nVersion = 1;
+    pfd.dwFlags = PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL|PFD_DOUBLEBUFFER;
+    pfd.iPixelType = PFD_TYPE_RGBA;
+    pfd.cColorBits = 24;
+    pfd.cAlphaBits = 8;
+    pfd.iLayerType = PFD_MAIN_PLANE;
+
+    HDC hdc = GetDC(window);
+    int pf_index = ChoosePixelFormat(hdc, &pfd);
+    DescribePixelFormat(hdc, pf_index, sizeof(PIXELFORMATDESCRIPTOR), &pfd);
+    SetPixelFormat(hdc, pf_index, &pfd);
+
+    HGLRC opengl_context = wglCreateContext(hdc);
+    if(!wglMakeCurrent(hdc, opengl_context) || !gladLoadGL()) {
+        CRASH;
+    }
+
+    ReleaseDC(window, hdc);
+}
+
 
 DWORD WINAPI update_and_render(LPVOID param) {
     Bitmap bitmap = {0};
     HWND window_handle = (HWND)param;
-    u32 x_offset = 0;
+    win32_opengl_init(window_handle);
+    HDC hdc = GetDC(window_handle);
+    
+    // u32 x_offset = 0;
 
-    RECT client_rect;
-    GetClientRect(window_handle, &client_rect);
-    int width = client_rect.right - client_rect.left;
-    int height = client_rect.bottom - client_rect.top;
-    win32_resize_bitmap(&bitmap, width, height);
+    // win32_resize_bitmap(&bitmap, width, height);
 
     while (window_is_running) {
-        set_bitmap_gradient(&bitmap, x_offset, 0);
-        win32_draw_bitmap(window_handle, &bitmap, 0, 0);
+        // set_bitmap_gradient(&bitmap, x_offset, 0);
+        // win32_draw_bitmap(window_handle, &bitmap, 0, 0);
+        // x_offset++;
+
+        RECT client_rect;
+        GetClientRect(window_handle, &client_rect);
+        int width = client_rect.right - client_rect.left;
+        int height = client_rect.bottom - client_rect.top;
+
+        glViewport(0, 0, width, height);
+
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
     
-        x_offset++;
+        glRotatef(0.1f, 0, 0, 1);
+    
+        glBegin(GL_TRIANGLES);
+        glColor3f(1.0f, 0.0f, 0.0f); glVertex2f(-0.6f, -0.75f);
+        glColor3f(0.0f, 1.0f, 0.0f); glVertex2f(0.6f, -0.75f);
+        glColor3f(0.0f, 0.0f, 1.0f); glVertex2f(0.0f, 0.75f);
+        glEnd();
+
+        SwapBuffers(hdc);
     }
 
+    ReleaseDC(window_handle, hdc);
     return 0;
 }
 
