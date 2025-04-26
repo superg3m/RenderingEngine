@@ -19,7 +19,7 @@ from c_build.source.Manager import *
 pc: ProjectConfig = ProjectConfig(
     project_name = "RenderingEngine",
     project_dependencies = [""],
-    project_debug_with_visual_studio = True,
+    project_debug_with_visual_studio = False,
     project_rebuild_project_dependencies = False,
     project_executable_procedures  = ["win32_main.exe"]
 )
@@ -55,6 +55,15 @@ if IS_WINDOWS():
     executable_procedure_libs += windows_libs
 
 procedures_config = {
+    "render_code": ProcedureConfigElement(
+        build_directory = f"./build_{cc.compiler_name}",
+        output_name = "render.dll",
+        source_files = ["../Source/render.c"],
+        additional_libs = executable_procedure_libs,
+        compile_time_defines = [],
+        compiler_inject_into_args = [],
+        include_paths = ["../Include", "../Libraries/glad/include"]
+    ),
     "win32_main": ProcedureConfigElement(
         build_directory = f"./build_{cc.compiler_name}",
         output_name = "win32_main.exe",
@@ -63,7 +72,7 @@ procedures_config = {
         compile_time_defines = [],
         compiler_inject_into_args = [],
         include_paths = ["../Include", "../Libraries/glad/include"]
-    ),
+    )
 }
 
 manager: Manager = Manager(cc, pc, procedures_config)

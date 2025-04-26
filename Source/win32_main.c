@@ -5,9 +5,6 @@ static volatile bool window_is_running = false;
 static HANDLE render_thread_handle = NULL;
 static HGLRC opengl_context = NULL;
 
-static double rotation_angle = 0.0;
-static const float ROTATION_SPEED = 180.0f;
-
 typedef BOOL (WINAPI PFNWGLSWAPINTERVALEXTPROC)(int);
 PFNWGLSWAPINTERVALEXTPROC* wglSwapIntervalEXT = NULL;
 
@@ -99,56 +96,95 @@ void cleanup_opengl(HWND window) {
     }
 }
 
-DWORD WINAPI update_and_render(LPVOID param) {
+typedef void (UpdateRenderFunc)(float delta_time, int width, int height);
+
+FILETIME get_last_write_time(const char* path) {
+    WIN32_FILE_ATTRIBUTE_DATA data;
+    if (GetFileAttributesExA(path, GetFileExInfoStandard, &data)) {
+        return data.ftLastWriteTime;
+    }
+    FILETIME zero = {0};
+    return zero;
+}
+
+BOOL filetime_changed(FILETIME a, FILETIME b) {
+    return CompareFileTime(&a, &b) != 0;
+}
+
+void copy_file(const char* src, const char* dst) {
+    CopyFileA(src, dst, FALSE);
+}
+
+DWORD WINAPI render_thread(LPVOID param) {
     HWND window_handle = (HWND)param;
     HDC hdc = GetDC(window_handle);
     win32_opengl_init(window_handle, hdc);
 
+    const char* dll_name = "render.dll";
+    const char* temp_dll = "render_temp.dll";
+
+    FILETIME last_write_time = get_last_write_time(dll_name);
+    copy_file(dll_name, temp_dll);
+
+    HMODULE render_module = LoadLibraryA(temp_dll);
+    UpdateRenderFunc* update_and_render = (UpdateRenderFunc*)GetProcAddress(render_module, "update_and_render");
+
     double current_time = os_query_performance_counter();
     double previous_time = current_time;
-    
+
     while (window_is_running) {
+        FILETIME new_time = get_last_write_time(dll_name);
+        if (filetime_changed(new_time, last_write_time)) {
+            last_write_time = new_time;
+            if (render_module) {
+                update_and_render = NULL;
+                FreeLibrary(render_module);
+                render_module = NULL;
+            }
+
+            Sleep(50);
+        
+            if (CopyFileA(dll_name, temp_dll, FALSE)) {
+                render_module = LoadLibraryA(temp_dll);
+                if (render_module) {
+                    update_and_render = (UpdateRenderFunc*)GetProcAddress(render_module, "update_and_render");
+                    if (!update_and_render) {
+                        CRASH;
+                    }
+                } else {
+                    CRASH;
+                }
+            } else {
+                CRASH;
+            }
+        }
+
         current_time = os_query_performance_counter();
         double delta_time = current_time - previous_time;
         double delta_time_seconds = delta_time / 1000.0f;
-        
-        rotation_angle += ROTATION_SPEED * delta_time_seconds;
-        if (rotation_angle >= 360.0) {
-            rotation_angle -= 360.0;
-        }
-        
+
         hdc = GetDC(window_handle);
         RECT client_rect;
         GetClientRect(window_handle, &client_rect);
         int width = client_rect.right - client_rect.left;
         int height = client_rect.bottom - client_rect.top;
-        
-        glViewport(0, 0, width, height);
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
 
-        glLoadIdentity();
-        glRotatef((float)rotation_angle, 0, 0, 1);
-        
-        glBegin(GL_TRIANGLES);
-        glColor3f(1.0f, 0.0f, 0.0f); glVertex2f(-0.6f, -0.75f);
-        glColor3f(0.0f, 1.0f, 0.0f); glVertex2f(0.6f, -0.75f);
-        glColor3f(0.0f, 0.0f, 1.0f); glVertex2f(0.0f, 0.75f);
-        glEnd();
-            
+        if (update_and_render) {
+            update_and_render((float)delta_time, width, height);
+        }
 
         SwapBuffers(hdc);
         ReleaseDC(window_handle, hdc);
-   
-		u64 fps = (u64)(1.0 / delta_time_seconds);
 
+        u64 fps = (u64)(1.0 / delta_time_seconds);
         char buffer[1024] = {0};
-		snprintf(buffer, ArrayCount(buffer), "%fms / FPS: %d\n", (float)delta_time, (u32)fps);
+        snprintf(buffer, sizeof(buffer), "%fms / FPS: %d\n", (float)delta_time, (u32)fps);
         OutputDebugStringA(buffer);
 
-		previous_time = current_time;
+        previous_time = current_time;
     }
-    
+
+    FreeLibrary(render_module);
     cleanup_opengl(window_handle);
     return 0;
 }
@@ -157,7 +193,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hInstPrev, PSTR cmdline, int
     HWND window_handle = window_create(hInstance, 800, 600, "Testing Window");
     window_is_running = true;
     
-    render_thread_handle = CreateThread(0, 0, update_and_render, (void*)window_handle, 0, 0);
+    render_thread_handle = CreateThread(0, 0, render_thread, (void*)window_handle, 0, 0);
     CloseHandle(render_thread_handle);
 
     while (window_is_running) {
