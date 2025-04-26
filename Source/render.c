@@ -17,7 +17,7 @@ __declspec(dllexport) void update_and_render(float delta_time, u32 width, u32 he
     
     glBegin(GL_TRIANGLES);
     glColor3f(1.0f, 0.0f, 0.0f); glVertex2f(-0.6f, -0.75f);
-    glColor3f(1.0f, 1.0f, 0.0f); glVertex2f(0.6f, -0.75f);
-    glColor3f(1.0f, 0.0f, 1.0f); glVertex2f(0.0f, 0.75f);
+    glColor3f(0.0f, 1.0f, 0.0f); glVertex2f(0.6f, -0.75f);
+    glColor3f(0.0f, 0.0f, 1.0f); glVertex2f(0.0f, 0.75f);
     glEnd();
 }

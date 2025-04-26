@@ -111,9 +111,6 @@ BOOL filetime_changed(FILETIME a, FILETIME b) {
     return CompareFileTime(&a, &b) != 0;
 }
 
-void copy_file(const char* src, const char* dst) {
-    CopyFileA(src, dst, FALSE);
-}
 
 DWORD WINAPI render_thread(LPVOID param) {
     HWND window_handle = (HWND)param;
@@ -124,10 +121,15 @@ DWORD WINAPI render_thread(LPVOID param) {
     const char* temp_dll = "render_temp.dll";
 
     FILETIME last_write_time = get_last_write_time(dll_name);
-    copy_file(dll_name, temp_dll);
+    if (!CopyFileA(dll_name, temp_dll, FALSE)) {
+        CRASH;
+    }
 
     HMODULE render_module = LoadLibraryA(temp_dll);
     UpdateRenderFunc* update_and_render = (UpdateRenderFunc*)GetProcAddress(render_module, "update_and_render");
+    if (!update_and_render) {
+        CRASH;
+    }
 
     double current_time = os_query_performance_counter();
     double previous_time = current_time;
@@ -142,7 +144,7 @@ DWORD WINAPI render_thread(LPVOID param) {
                 render_module = NULL;
             }
 
-            Sleep(25);
+            Sleep(10);
         
             if (CopyFileA(dll_name, temp_dll, FALSE)) {
                 render_module = LoadLibraryA(temp_dll);

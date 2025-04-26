@@ -18,20 +18,13 @@ from c_build.source.Manager import *
 
 pc: ProjectConfig = ProjectConfig(
     project_name = "RenderingEngine",
-    project_dependencies = [""],
     project_debug_with_visual_studio = False,
     project_rebuild_project_dependencies = False,
-    project_executable_procedures  = ["win32_main.exe"]
+    project_executable_names = ["win32_main.exe"]
 )
 
 cc: CompilerConfig = CompilerConfig(
     compiler_name = C_BUILD_COMPILER_NAME() if C_BUILD_IS_DEPENDENCY() else "INVALID_COMPILER",
-    compiler_std_version = "",
-    compiler_warning_level = "",
-    compiler_disable_specific_warnings = [""],
-    compiler_treat_warnings_as_errors = True,
-    compiler_disable_warnings  = False,
-    compiler_disable_sanitizer = True
 )
 
 if IS_WINDOWS() and not C_BUILD_IS_DEPENDENCY():
@@ -51,27 +44,25 @@ else:
 
 executable_procedure_libs = []
 if IS_WINDOWS():
-    windows_libs = ["Kernel32.lib", "User32.lib", "Gdi32.lib", "OpenGL32.lib"] if cc.compiler_name == "cl" else ["-lUser32", "-lGdi32"]
+    windows_libs = [GET_LIB_FLAG(cc, "Kernel32"), GET_LIB_FLAG(cc, "User32"), GET_LIB_FLAG(cc, "Gdi32"), GET_LIB_FLAG(cc, "OpenGL32")]
     executable_procedure_libs += windows_libs
 
+build_postfix = f"build_{cc.compiler_name}/{C_BUILD_BUILD_TYPE()}"
 procedures_config = {
-    "render_code": ProcedureConfigElement(
-        build_directory = f"./build_{cc.compiler_name}",
+    "render_code": ProcedureConfig(
+        build_directory = f"./{build_postfix}",
         output_name = "render.dll",
-        source_files = ["../Source/render.c"],
+        source_files = ["../../Source/render.c"],
         additional_libs = executable_procedure_libs,
-        compile_time_defines = [],
-        compiler_inject_into_args = [],
-        include_paths = ["../Include", "../Libraries/glad/include"]
+        include_paths = ["../../Include", "../../Libraries/glad/include"],
+        on_source_change_recompile = True
     ),
-    "win32_main": ProcedureConfigElement(
-        build_directory = f"./build_{cc.compiler_name}",
+    "win32_main": ProcedureConfig(
+        build_directory = f"./{build_postfix}",
         output_name = "win32_main.exe",
-        source_files = ["../Source/win32_main.c", "../Libraries/glad/src/glad.c"],
+        source_files = ["../../Source/win32_main.c", "../../Libraries/glad/src/glad.c"],
         additional_libs = executable_procedure_libs,
-        compile_time_defines = [],
-        compiler_inject_into_args = [],
-        include_paths = ["../Include", "../Libraries/glad/include"]
+        include_paths = ["../../Include", "../../Libraries/glad/include"]
     )
 }
 
