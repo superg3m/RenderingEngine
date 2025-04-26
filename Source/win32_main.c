@@ -142,7 +142,7 @@ DWORD WINAPI render_thread(LPVOID param) {
                 render_module = NULL;
             }
 
-            Sleep(50);
+            Sleep(25);
         
             if (CopyFileA(dll_name, temp_dll, FALSE)) {
                 render_module = LoadLibraryA(temp_dll);
