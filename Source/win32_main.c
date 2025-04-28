@@ -151,12 +151,15 @@ DWORD WINAPI render_thread(LPVOID param) {
                 if (render_module) {
                     update_and_render = (UpdateRenderFunc*)GetProcAddress(render_module, "update_and_render");
                     if (!update_and_render) {
+                        OutputDebugStringA("Invalid update and render pointer\n");
                         CRASH;
                     }
                 } else {
+                    OutputDebugStringA("Invalid load library\n");
                     CRASH;
                 }
             } else {
+                OutputDebugStringA("Failed to copy file\n");
                 CRASH;
             }
         }

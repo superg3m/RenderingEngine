@@ -18,7 +18,7 @@ from c_build.source.Manager import *
 
 pc: ProjectConfig = ProjectConfig(
     project_name = "RenderingEngine",
-    project_debug_with_visual_studio = False,
+    project_debug_with_visual_studio = True,
     project_rebuild_project_dependencies = False,
     project_executable_names = ["win32_main.exe"]
 )
