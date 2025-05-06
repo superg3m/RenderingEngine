@@ -71,7 +71,7 @@ typedef struct Interactable {
     float cooldown_timer;
 
     // Sequence logic
-    s32 true_sequence_value; // default set to -1 as placeholder
+    s32 true_sequence_value; // set to 0, 1, 2 and so on
     s32 sequence_order; // default set to -1 as placeholder then overwriten by true_sequence_value when trigger is active.
 } Interactable;
 
