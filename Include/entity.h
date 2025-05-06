@@ -27,27 +27,25 @@ typedef struct {
     u32 height_map_id;
     // Shader shader;
 
-    union {
-        struct { // Damage
-            u32 fire_damage;
-            u32 physical_damage;
-            u32 cold_damage;
-        };
+    struct { // Damage
+        u32 fire_damage;
+        u32 physical_damage;
+        u32 cold_damage;
+    };
 
-        struct { // Status Effects
-            u32 status_flags;
-            u32 duration_in_seconds;
-        };
+    struct { // Status Effects
+        u32 status_flags;
+        u32 duration_in_seconds;
+    };
 
-        struct { // Resources
-            u32 max_health;
-            u32 health;
+    struct { // Resources
+        u32 max_health;
+        u32 health;
 
-            u32 max_stamina;
-            u32 stamina;
+        u32 max_stamina;
+        u32 stamina;
 
-            u32 max_mana;
-            u32 mana;
-        };
+        u32 max_mana;
+        u32 mana;
     };
 } Entity;
