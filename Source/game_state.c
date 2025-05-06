@@ -1,18 +1,17 @@
-#include <entity.h>
+#include <game_state.h>
 
-typedef struct GameState {
-    u8* permanent_memory;
-    u8* temperary_memory;
+Entity* game_state_get_entity(GameState* game, EntityID identifer) {
+    Entity* entities = (Entity*)game->entity_arena.base_address;
+    return entities[identifer.entity_index];
+}
 
-    struct {
-        float gravity;    // defaults to -9.8
-        float time_scale; // defaults to  1.0
-    } rules;
+Entity* game_state_push_entity(GameState* game) {
+    Entity* e = ckg_arena_push(game->entity_arena, Entity);
+    e->identifer.entity_index = game->entity_count;
+    e->identifer.reference_id = game->next_unique_reference_id++;
 
-    u64 next_unique_reference_id; // stable and unique
-    Entity gameplay_entities[256];
-    Entity static_entities[256];
-} GameState;
+    return e;
+}
 
 internal GameState deserialize_game_state() {
     GameState game = {0};
@@ -25,14 +24,17 @@ internal GameState deserialize_game_state() {
     return game;
 }
 
-GameState game_state_restore(u8* permanent_memory, u8* temperary_memory) {
-    GameState game = deserialize_game_state();
+GameState game_state_restore(u8* memory, size_t memory_size_bytes) {
+    GameState game = deserialize_game_state(); // Loads saved game state values (e.g., entity_count, rules, etc.)
 
-    // Date: May 05, 2025
-    // NOTE(Jovanni): I have to overwrite these becuase the serialized data
-    // is not longer useful after the virtual address space changes on a new instance of the process
-    game.permanent_memory = permanent_memory;
-    game.temperary_memory = temperary_memory;
+    // Partition memory manually
+    size_t arena_size = memory_size_bytes / 5; // Divide equally among 5 arenas
+
+    game.permanent_arena  = ckg_arena_create_fixed(memory + arena_size * 0, arena_size);
+    game.entity_arena     = ckg_arena_create_fixed(memory + arena_size * 1, arena_size);
+    game.asset_arena      = ckg_arena_create_fixed(memory + arena_size * 2, arena_size);
+    game.evictable_arena  = ckg_arena_create_fixed(memory + arena_size * 3, arena_size);
+    game.scratch_arena    = ckg_arena_create_fixed(memory + arena_size * 4, arena_size);
 
     return game;
 }

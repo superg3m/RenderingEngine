@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "glad.h": "c"
+        "glad.h": "c",
+        "entity.h": "c",
+        "game_state.h": "c"
     }
 }

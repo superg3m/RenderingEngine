@@ -83,10 +83,14 @@ typedef struct {
     Entity** interactables; // for sequence interate through check if first non-negative number is 0 then 0 + 1 and so on
 } Triggerable;
 
+typedef struct EntityID {
+    u64 reference_id;
+    u32 entity_index;
+} EntityID;
+
 typedef struct Entity {
     // base
-    u64 unique_reference_id;
-    u32 entity_index;
+    EntityID identifer;
     EntityType type;
     Transform transform;
     Mesh mesh;
