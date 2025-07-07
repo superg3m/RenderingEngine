@@ -3,11 +3,11 @@
 #include <entity.h>
 
 typedef struct GameState {
-    CKG_Arena* permanent_arena;   // General-purpose permanent memory
-    CKG_Arena* entity_arena;      // For entity structss
-    CKG_Arena* asset_arena;       // Textures, models, sounds, etc.
-    CKG_Arena* evictable_arena;  // For things that can be evicted
-    CKG_Arena* scratch_arena;     // Frame-local scratch (temporary, reset every tick/frame)
+    CKG_Arena permanent_arena;   // General-purpose permanent memory
+    CKG_Arena entity_arena;      // For entity structss
+    CKG_Arena asset_arena;       // Textures, models, sounds, etc.
+    CKG_Arena evictable_arena;  // For things that can be evicted
+    CKG_Arena scratch_arena;     // Frame-local scratch (temporary, reset every tick/frame)
 
     struct {
         float gravity;    // defaults to -9.8

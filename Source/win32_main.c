@@ -111,7 +111,6 @@ BOOL filetime_changed(FILETIME a, FILETIME b) {
     return CompareFileTime(&a, &b) != 0;
 }
 
-
 DWORD WINAPI render_thread(LPVOID param) {
     HWND window_handle = (HWND)param;
     HDC hdc = GetDC(window_handle);
@@ -145,21 +144,20 @@ DWORD WINAPI render_thread(LPVOID param) {
             }
 
             Sleep(10);
-        
-            if (CopyFileA(dll_name, temp_dll, FALSE)) {
-                render_module = LoadLibraryA(temp_dll);
-                if (render_module) {
-                    update_and_render = (UpdateRenderFunc*)GetProcAddress(render_module, "update_and_render");
-                    if (!update_and_render) {
-                        OutputDebugStringA("Invalid update and render pointer\n");
-                        CRASH;
-                    }
-                } else {
-                    OutputDebugStringA("Invalid load library\n");
+
+            while (!CopyFileA(dll_name, temp_dll, FALSE)) {
+                Sleep(10);
+            }
+
+            render_module = LoadLibraryA(temp_dll);
+            if (render_module) {
+                update_and_render = (UpdateRenderFunc*)GetProcAddress(render_module, "update_and_render");
+                if (!update_and_render) {
+                    OutputDebugStringA("Invalid update and render pointer\n");
                     CRASH;
                 }
             } else {
-                OutputDebugStringA("Failed to copy file\n");
+                OutputDebugStringA("Invalid load library\n");
                 CRASH;
             }
         }

@@ -83,6 +83,10 @@ typedef struct {
     Entity** interactables; // for sequence interate through check if first non-negative number is 0 then 0 + 1 and so on
 } Triggerable;
 
+// Date: June 03, 2025
+// TODO(Jovanni): I think the reference ID is a unique ID for serialization?
+// The reference_id is for pointing another entity at this reference in a stable way
+// think of like a puzzle where you reference some type of trigger entity you would use the reference_id
 typedef struct EntityID {
     u64 reference_id;
     u32 entity_index;
