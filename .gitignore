@@ -37,14 +37,10 @@
 *.ilk
 
 # c-build
-build_cl/
-/Tests/CoreTest/build_cl
-/Tests/GraphicsTest/build_cl
+build_*/
+/Tests/CoreTest/build_*
+/Tests/GraphicsTest/build_*
 
-build_cl/
 c_build/
-*.ps1
-!bootstrap.ps1
 ckg/
 ckit/
-c_build_dependency_cache_*.json
